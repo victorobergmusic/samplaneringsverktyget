@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Samplaneringsverktyget</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  :root{
+    --bg:#f2f6f5; --card:#ffffff; --ink:#2e4442; --muted:#6b8583;
+    --accent:#5b8a8f; --accent-soft:#dcebe9; --accent-deep:#3d6b70;
+    --line:#d7e3e1; --warn:#c2803f; --alert:#c05b4d;
+    --nat:#7aa6c2; --reg:#8fbf9f; --lan:#c9a86e; --kom:#b58fb8; --ovr:#9aa5b1;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);}
+  header{position:sticky;top:0;z-index:50;background:var(--card);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:16px;padding:10px 20px;flex-wrap:wrap;}
+  header h1{font-size:1.05rem;margin:0;color:var(--accent-deep);white-space:nowrap;}
+  #sakfragaBadge{font-size:.9rem;color:var(--muted);flex:1;min-width:120px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 14px;
+    cursor:pointer;font-size:.88rem;transition:background .15s, transform .1s;}
+  .btn:hover{background:var(--accent-deep);}
+  .btn:active{transform:scale(.97);}
+  .btn.ghost{background:var(--accent-soft);color:var(--accent-deep);}
+  .btn.ghost:hover{background:#cfe2df;}
+  .btn.small{padding:5px 10px;font-size:.8rem;}
+  .btn.danger{background:#f0e0da;color:#8a4b32;}
+  nav{display:flex;gap:4px;background:var(--card);padding:0 20px;border-bottom:1px solid var(--line);flex-wrap:wrap;}
+  nav button{background:none;border:none;border-bottom:3px solid transparent;padding:12px 16px;
+    font-size:.92rem;color:var(--muted);cursor:pointer;}
+  nav button.active{color:var(--accent-deep);border-bottom-color:var(--accent);font-weight:600;}
+  main{padding:20px;max-width:1400px;margin:0 auto;}
+  section.tab{display:none;animation:fade .25s;}
+  section.tab.active{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px;
+    box-shadow:0 1px 3px rgba(46,68,66,.06);}
+  .card h2{margin:0 0 12px;font-size:1rem;color:var(--accent-deep);}
+  label{display:block;font-size:.83rem;color:var(--muted);margin:10px 0 4px;}
+  input[type=text],input[type=email],select,textarea{
+    width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;
+    font-size:.9rem;background:#fbfdfd;color:var(--ink);}
+  textarea{min-height:60px;resize:vertical;}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent);}
+  .row{display:flex;gap:14px;flex-wrap:wrap;}
+  .row>*{flex:1;min-width:180px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);
+    border-radius:20px;padding:5px 12px;font-size:.85rem;margin:3px;}
+  .chip .lvl{width:10px;height:10px;border-radius:50%;}
+  .chip button{border:none;background:none;cursor:pointer;color:var(--muted);font-size:.9rem;}
+  table{width:100%;border-collapse:collapse;font-size:.85rem;}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{color:var(--muted);font-weight:600;}
+  .grid-chart{position:relative;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .axis-hint{font-size:.78rem;color:var(--muted);text-align:center;margin:4px 0;}
+  .mgrid{display:grid;grid-template-columns:110px repeat(3,1fr);grid-auto-rows:auto;gap:6px;position:relative;}
+  .mgrid .ylab{display:flex;align-items:center;justify-content:center;text-align:center;font-size:.78rem;
+    color:var(--accent-deep);background:var(--accent-soft);border-radius:10px;padding:6px;}
+  .mgrid .xlab{background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;text-align:center;
+    font-size:.78rem;padding:8px;display:flex;align-items:center;justify-content:center;}
+  .cell{background:#f7fafa;border:1px dashed var(--line);border-radius:10px;padding:8px;min-height:64px;
+    display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;}
+  .node{border-radius:10px;padding:7px 11px;font-size:.8rem;cursor:pointer;color:#fff;max-width:150px;
+    box-shadow:0 1px 3px rgba(0,0,0,.15);transition:transform .1s, box-shadow .15s;position:relative;z-index:2;}
+  .node:hover{transform:translateY(-2px);}
+  .node.selected{outline:3px solid var(--warn);box-shadow:0 3px 8px rgba(0,0,0,.25);}
+  .node.dim{opacity:.35;}
+  svg.arrows{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem;color:var(--muted);margin-top:8px;}
+  .legend span{display:inline-flex;align-items:center;gap:5px;}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
+  .dgrid{display:grid;grid-template-columns:130px repeat(3,1fr);gap:6px;}
+  .dgrid .head{background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;
+    font-size:.78rem;padding:8px;text-align:center;display:flex;align-items:center;justify-content:center;}
+  .forumcard{background:#fff;border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:8px;
+    padding:8px 10px;font-size:.82rem;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.1);width:100%;
+    transition:transform .1s;font-weight:600;color:var(--ink);}
+  .forumcard:hover{transform:translateY(-2px);}
+  .forumcard.saknas{border-style:dashed;border-width:1px 1px 1px 5px;background:#fdf6ef;border-left-color:var(--warn);}
+  .forumcard.utv{border-left-color:var(--alert);}
+  .rgrid{display:grid;gap:6px;}
+  .rgrid .head{background:var(--accent-soft);color:var(--accent-deep);border-radius:10px;font-size:.75rem;
+    padding:8px 6px;text-align:center;display:flex;align-items:center;justify-content:center;}
+  .rgrid .actorcell{background:#f7fafa;border:1px solid var(--line);border-radius:10px;padding:8px 10px;
+    font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:8px;cursor:pointer;transition:transform .1s;}
+  .rgrid .actorcell:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(46,68,66,.15);}
+  .rgrid .rcell{background:#f7fafa;border:1px dashed var(--line);border-radius:10px;
+    display:flex;align-items:center;justify-content:center;min-height:38px;}
+  .rdot{width:16px;height:16px;border-radius:50%;background:var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.2);}
+  .rolecheck{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fbfdfd;}
+  .rolecheck>label{display:flex;align-items:center;gap:8px;margin:0;color:var(--ink);font-size:.88rem;cursor:pointer;}
+  .rolecheck textarea{margin-top:8px;min-height:44px;}
+  .board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media(max-width:900px){.board{grid-template-columns:1fr;}}
+  .col{background:var(--accent-soft);border-radius:14px;padding:12px;min-height:200px;}
+  .col h3{margin:0 0 10px;font-size:.92rem;color:var(--accent-deep);}
+  .todo-card{background:#fff;border-radius:10px;padding:9px 11px;font-size:.85rem;margin-bottom:8px;
+    box-shadow:0 1px 3px rgba(0,0,0,.1);cursor:grab;}
+  .todo-card .tools{display:flex;gap:6px;justify-content:flex-end;margin-top:6px;}
+  .todo-card .tools button{border:none;background:none;cursor:pointer;color:var(--muted);font-size:.78rem;}
+  .col.dragover{outline:2px dashed var(--accent);}
+  .checkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:4px;font-size:.85rem;}
+  .checkgrid label{display:flex;align-items:center;gap:6px;margin:2px 0;color:var(--ink);}
+  .hint{font-size:.8rem;color:var(--muted);font-style:italic;}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;}
+  .overlay{position:fixed;inset:0;background:rgba(46,68,66,.38);backdrop-filter:blur(2px);
+    display:none;align-items:flex-start;justify-content:center;z-index:100;padding:40px 16px;overflow:auto;}
+  .overlay.show{display:flex;}
+  .modal{background:#fff;border-radius:18px;max-width:600px;width:100%;padding:24px;
+    box-shadow:0 12px 40px rgba(46,68,66,.3);animation:pop .22s ease;}
+  .modal.narrow{max-width:460px;text-align:center;}
+  .modal.narrow p{font-size:.92rem;color:var(--muted);margin:8px 0 0;}
+  .modal.narrow .worktitle{font-size:1rem;color:var(--ink);font-weight:600;margin-top:6px;}
+  .modal.narrow .actions{justify-content:center;margin-top:20px;}
+  @keyframes pop{from{opacity:0;transform:scale(.94) translateY(8px);}to{opacity:1;transform:none;}}
+  .modal h2{margin:0 0 6px;font-size:1.05rem;color:var(--accent-deep);}
+  .modal .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;justify-content:flex-end;}
+  .popover{position:absolute;z-index:95;background:#fff;border-radius:14px;padding:14px 16px;max-width:340px;
+    box-shadow:0 8px 28px rgba(46,68,66,.28);font-size:.84rem;animation:pop .18s ease;border:1px solid var(--line);}
+  .popover h3{margin:0 0 6px;font-size:.95rem;color:var(--accent-deep);display:flex;align-items:center;gap:8px;}
+  .popover .field{margin:5px 0;}
+  .popover .field b{color:var(--muted);font-weight:600;font-size:.76rem;display:block;}
+  .popover .actions{display:flex;gap:8px;margin-top:10px;justify-content:flex-end;}
+  .tag{display:inline-block;background:var(--accent-soft);color:var(--accent-deep);border-radius:12px;
+    padding:2px 9px;font-size:.72rem;margin:2px 2px 0 0;}
+  .tag.red{background:#f5e0dc;color:#8a4b32;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Samplaneringsverktyget</h1>
+  <span id="sakfragaBadge">Ingen sakfråga angiven ännu</span>
+  <button class="btn ghost" onclick="openResetModal()">Ny sakfråga</button>
+  <button class="btn" onclick="exportExcel()">Spara ditt arbete</button>
+  <button class="btn ghost" onclick="document.getElementById('importFile').click()">Importera sakfråga eller process</button>
+  <input type="file" id="importFile" accept=".xlsx" style="display:none" onchange="importExcel(this)">
+</header>
+
+<nav>
+  <button class="active" onclick="showTab('start',this)">Start &amp; aktörer</button>
+  <button onclick="showTab('mandat',this)">Mandatlandskapet</button>
+  <button onclick="showTab('dialog',this)">Dialog &amp; samverkan</button>
+  <button onclick="showTab('roller',this)">Roller</button>
+  <button onclick="showTab('todo',this)">Anteckningar &amp; utveckling</button>
+</nav>
+
+<main>
+<!-- ================= FLIK 1 ================= -->
+<section class="tab active" id="tab-start">
+  <div class="card">
+    <h2>Vilken sakfråga eller process ska kartläggas?</h2>
+    <input type="text" id="sakfraga" placeholder="T.ex. Regional vattenförsörjning ..." oninput="setSakfraga(this.value)">
+    <p class="hint">Svaret blir också namnet på filen när du sparar ditt arbete.</p>
+  </div>
+
+  <div class="card">
+    <h2>Aktörer</h2>
+    <div class="row">
+      <div><label>Vilken aktör?</label><input type="text" id="aNamn"></div>
+      <div><label>Vilken nivå tillhör aktören?</label>
+        <select id="aNiva" onchange="toggleAktorExtra()">
+          <option>Nationell</option><option>Regional</option><option>Kommunal</option>
+          <option>Näringsliv</option><option>Övrig</option>
+        </select></div>
+      <div id="aDepWrap"><label>Vilket departement ligger myndigheten under?</label><input type="text" id="aDep"></div>
+      <div id="aOvrWrap" style="display:none"><label>Beskriv nivå (fritext)</label><input type="text" id="aOvr"></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn" onclick="addAktor()">Lägg till aktör</button></div>
+    <div id="aktorList" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Kontaktpersoner för sakfråga/process</h2>
+    <div class="row">
+      <div><label>Namn</label><input type="text" id="kNamn"></div>
+      <div><label>Roll</label><input type="text" id="kRoll"></div>
+      <div><label>Mail</label><input type="email" id="kMail"></div>
+      <div><label>Telefon</label><input type="text" id="kTel"></div>
+    </div>
+    <label>Anteckningar</label><textarea id="kAnt"></textarea>
+    <div style="margin-top:10px"><button class="btn" onclick="addKontakt()">Lägg till kontaktperson</button></div>
+    <div id="kontaktList" style="margin-top:12px"></div>
+  </div>
+</section>
+
+<!-- ================= FLIK 2 ================= -->
+<section class="tab" id="tab-mandat">
+  <div class="toolbar">
+    <button class="btn" onclick="openMandatModal()">Lägg till aktör i mandatlandskapet</button>
+    <button class="btn ghost" id="allRelBtn" onclick="toggleAllRel()">Visa alla relationer</button>
+    <button class="btn ghost" onclick="saveImage('mandatCapture','mandatlandskap')">Spara bild</button>
+    <span class="hint">Markera en aktör för att illustrera beroenden.</span>
+  </div>
+  <div class="grid-chart" id="mandatCapture">
+    <div class="axis-hint">Beroende av andra aktörer för att arbeta inom sitt juridiska mandat →</div>
+    <div class="mgrid" id="mgrid"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--nat)"></span>Nationell</span>
+      <span><span class="dot" style="background:var(--reg)"></span>Regional</span>
+      <span><span class="dot" style="background:var(--kom)"></span>Kommunal</span>
+      <span><span class="dot" style="background:var(--lan)"></span>Näringsliv</span>
+      <span><span class="dot" style="background:var(--ovr)"></span>Övrig</span>
+      <span style="margin-left:12px">Pilar: <b style="color:#4a7fb5">→ är beroende av</b>&nbsp;
+      <b style="color:#4e9367">→ beroende av markerad</b>&nbsp;<b style="color:#c2803f">↔ ömsesidigt</b></span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FLIK 3 ================= -->
+<section class="tab" id="tab-dialog">
+  <div class="toolbar">
+    <button class="btn" onclick="openForumModal()">Lägg till forum</button>
+    <button class="btn ghost" onclick="saveImage('dialogCapture','dialoglandskap')">Spara bild</button>
+    <label style="margin:0;display:flex;align-items:center;gap:6px">Visa forum med roll:
+      <select id="fFilter" onchange="renderDialog()" style="width:auto">
+        <option value="alla">Alla</option><option>Central roll</option><option>Stödjande roll</option>
+      </select></label>
+    <span class="hint">Klicka på ett forum för att läsa mer.</span>
+  </div>
+  <div class="grid-chart" id="dialogCapture">
+    <div class="dgrid" id="dgrid"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--accent)"></span>Befintligt forum</span>
+      <span><span class="dot" style="background:var(--warn)"></span>Forum som saknas</span>
+      <span><span class="dot" style="background:var(--alert)"></span>Utvecklingsbehov</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FLIK 4: ROLLER ================= -->
+<section class="tab" id="tab-roller">
+  <div class="toolbar">
+    <button class="btn" onclick="openRollerModal()">Lägg till roller för aktör</button>
+    <button class="btn ghost" onclick="saveImage('rollerCapture','roller')">Spara bild</button>
+    <span class="hint">Klicka på en aktör i matrisen för att läsa mer.</span>
+  </div>
+  <div class="grid-chart" id="rollerCapture">
+    <div class="axis-hint">Kartläggning av aktörer och roller i sakfrågan</div>
+    <div class="rgrid" id="rgrid"></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--nat)"></span>Nationell</span>
+      <span><span class="dot" style="background:var(--reg)"></span>Regional</span>
+      <span><span class="dot" style="background:var(--kom)"></span>Kommunal</span>
+      <span><span class="dot" style="background:var(--lan)"></span>Näringsliv</span>
+      <span><span class="dot" style="background:var(--ovr)"></span>Övrig</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FLIK 5 ================= -->
+<section class="tab" id="tab-todo">
+  <div class="board" id="board"></div>
+</section>
+</main>
+
+<!-- ================= MODAL: START/NY SAKFRÅGA ================= -->
+<div class="overlay" id="resetOverlay">
+  <div class="modal narrow">
+    <h2 id="resetTitle">Det finns ett pågående arbete</h2>
+    <div class="worktitle" id="resetWorkTitle"></div>
+    <p id="resetText">Vill du fortsätta där du slutade eller börja med en tom sakfråga?</p>
+    <div class="actions">
+      <button class="btn" id="resetContinueBtn" onclick="closeResetModal()">Fortsätt där du slutade</button>
+      <button class="btn ghost" onclick="exportExcel()">Ladda ner säkerhetskopia (Excel)</button>
+      <button class="btn danger" onclick="startBlank()">Börja med tom sakfråga</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: MANDAT ================= -->
+<div class="overlay" id="mandatOverlay" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <h2 id="mandatModalTitle">Lägg till aktör i mandatlandskapet</h2>
+    <label>Välj aktör (från startsidan)</label>
+    <select id="mAktor" onchange="loadMandatForm()"></select>
+    <label>Beskrivning av grunduppdrag</label><textarea id="mGrund"></textarea>
+    <label>Juridiskt mandat</label>
+    <select id="mMandat">
+      <option>Juridiskt beslutande</option><option>Juridiskt vägledande</option><option>Inget juridiskt mandat</option>
+    </select>
+    <label>Beskrivning av juridiskt mandat</label><textarea id="mMandatB"></textarea>
+    <label>Beroende av andra aktörer att uppfylla sitt juridiska mandat</label>
+    <select id="mBeroende">
+      <option>Lågt beroende</option><option>Medel beroende</option><option>Högt beroende</option>
+    </select>
+    <label>Beskriv beroendet av andra aktörer</label><textarea id="mBeroendeB"></textarea>
+    <label>Generella anteckningar</label><textarea id="mAnt"></textarea>
+    <label>Vilka andra aktörer är aktören beroende av?</label>
+    <div class="checkgrid" id="mDeps"></div>
+    <div class="actions">
+      <button class="btn danger small" onclick="removeMandat()">Ta bort ur landskapet</button>
+      <button class="btn ghost" onclick="closeModals()">Avbryt</button>
+      <button class="btn" onclick="saveMandat()">Spara</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: FORUM ================= -->
+<div class="overlay" id="forumOverlay" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <h2 id="forumModalTitle">Lägg till forum</h2>
+    <label>Vad är status på forumet?</label>
+    <select id="fStatus"><option>Befintligt forum</option><option>Forum som saknas</option></select>
+    <label>Vad är forumets namn?</label><input type="text" id="fNamn">
+    <label>Vilka aktörer ingår i forumet?</label>
+    <div class="checkgrid" id="fAktorer"></div>
+    <label>Vilken nivå sammankallar forumet?</label>
+    <select id="fSamman" onchange="document.getElementById('fSammanOvrWrap').style.display=this.value==='Övrig'?'block':'none'">
+      <option>Nationell nivå</option><option>Regional nivå</option><option>Kommunal nivå</option><option>Övrig</option>
+    </select>
+    <div id="fSammanOvrWrap" style="display:none"><label>Övrig sammankallande är:</label><input type="text" id="fSammanOvr"></div>
+    <label>Vad är forumets syfte?</label><textarea id="fSyfte"></textarea>
+    <label>Vilken roll har forumet i denna sakfråga?</label>
+    <select id="fRoll"><option>Central roll</option><option>Stödjande roll</option></select>
+    <label>Vilken typ av samverkan är det?</label>
+    <select id="fTyp"><option>Direkt kontakt</option><option>Samordning och information</option><option>Beslutande nivå</option></select>
+    <label>Hur ofta sker möten?</label><input type="text" id="fFrekvens">
+    <label>Behöver forumet utvecklas?</label>
+    <select id="fUtv" onchange="document.getElementById('fUtvBWrap').style.display=this.value==='Ja'?'block':'none'">
+      <option>Nej</option><option>Ja</option></select>
+    <div id="fUtvBWrap" style="display:none"><label>Förtydliga utvecklingsbehov</label><textarea id="fUtvB"></textarea></div>
+    <label>Finns det arbetsformer för att förankra arbetet som sker i forumet?</label>
+    <select id="fForankring"><option>Ja</option><option>Nej</option></select>
+    <label>Generella anteckningar</label><textarea id="fAnt"></textarea>
+    <div class="actions">
+      <button class="btn danger small" onclick="deleteForum()">Ta bort forum</button>
+      <button class="btn ghost" onclick="closeModals()">Avbryt</button>
+      <button class="btn" onclick="saveForum()">Spara forum</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: ROLLER ================= -->
+<div class="overlay" id="rollerOverlay" onclick="if(event.target===this)closeModals()">
+  <div class="modal">
+    <h2 id="rollerModalTitle">Lägg till roller för aktör</h2>
+    <label>Välj aktör (från startsidan)</label>
+    <select id="rAktor" onchange="loadRollerForm()"></select>
+    <label>Vilka roller har aktören i sakfrågan?</label>
+    <div id="rRoller"></div>
+    <label>Generella anteckningar</label><textarea id="rAnt"></textarea>
+    <div class="actions">
+      <button class="btn danger small" onclick="removeRoller()">Ta bort ur matrisen</button>
+      <button class="btn ghost" onclick="closeModals()">Avbryt</button>
+      <button class="btn" onclick="saveRoller()">Spara</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= STATE ================= */
+const LEVELS = {Nationell:'var(--nat)',Regional:'var(--reg)',Kommunal:'var(--kom)','Näringsliv':'var(--lan)','Övrig':'var(--ovr)'};
+const LVLVAR = {Nationell:'nat',Regional:'reg',Kommunal:'kom','Näringsliv':'lan','Övrig':'ovr'};
+const TYPER = ['Direkt kontakt','Samordning och information','Beslutande nivå'];
+const SAMMAN = ['Nationell nivå','Regional nivå','Kommunal nivå','Övrig'];
+const ROLLER = ['Lagstiftning','Tillsynsansvar','Vägledande','Sammankallande ansvar',
+  'Utformande av styrdokument','Kunskapsproducerande','Genomförande'];
+const TODO_COLS = [['roller','Roller och ansvar'],['samverkan','Samverkan och dialog'],['verktyg','Verktyg, metoder och kunskap']];
+const blankState=()=>({sakfraga:'',aktorer:[],kontakter:[],mandat:{},forum:[],roller:{},todo:{roller:[],samverkan:[],verktyg:[]}});
+let state = blankState();
+let selectedNode=null, showAllRel=false, editingForum=null;
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const save=()=>{try{localStorage.setItem('samverkan',JSON.stringify(state));}catch(e){}};
+
+/* ================= NY SAKFRÅGA / STARTVAL ================= */
+function hasWork(){
+  return !!(state.sakfraga||state.aktorer.length||state.kontakter.length||
+    Object.keys(state.mandat).length||state.forum.length||Object.keys(state.roller).length||
+    state.todo.roller.length||state.todo.samverkan.length||state.todo.verktyg.length);
+}
+function openResetModal(startup){
+  if(!hasWork()){
+    if(!startup)alert('Arbetsytan är redan tom.');
+    return;
+  }
+  closePopover();closeModals();
+  document.getElementById('resetTitle').textContent=startup?'Det finns ett pågående arbete':'Börja om med ny sakfråga?';
+  document.getElementById('resetWorkTitle').textContent=state.sakfraga?'”'+state.sakfraga+'”':'(Sakfråga utan namn)';
+  document.getElementById('resetText').textContent=startup
+    ?'Vill du fortsätta där du slutade eller börja med en tom sakfråga?'
+    :'Allt nuvarande arbete rensas från arbetsytan. Ladda gärna ner en säkerhetskopia först.';
+  document.getElementById('resetContinueBtn').textContent=startup?'Fortsätt där du slutade':'Avbryt';
+  document.getElementById('resetOverlay').classList.add('show');
+}
+function closeResetModal(){document.getElementById('resetOverlay').classList.remove('show');}
+function startBlank(){
+  state=blankState();
+  selectedNode=null;editingForum=null;showAllRel=false;
+  document.getElementById('allRelBtn').textContent='Visa alla relationer';
+  save();closeResetModal();renderAll();
+}
+
+/* ================= TABS ================= */
+function showTab(id,btn){
+  closePopover();closeModals();
+  document.querySelectorAll('section.tab').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active'); btn.classList.add('active');
+  renderAll();
+}
+
+/* ================= POPOVER ================= */
+function closePopover(){document.querySelectorAll('.popover').forEach(p=>p.remove());}
+function showPopover(html,anchorEl){
+  closePopover();
+  const p=document.createElement('div');p.className='popover';p.innerHTML=html;
+  document.body.appendChild(p);
+  const r=anchorEl.getBoundingClientRect();
+  let x=r.right+window.scrollX+10, y=r.top+window.scrollY-6;
+  if(x+p.offsetWidth>window.scrollX+document.documentElement.clientWidth-12)
+    x=Math.max(12,r.left+window.scrollX-p.offsetWidth-10);
+  if(y+p.offsetHeight>window.scrollY+document.documentElement.clientHeight-12)
+    y=Math.max(window.scrollY+12,window.scrollY+document.documentElement.clientHeight-p.offsetHeight-12);
+  p.style.left=x+'px';p.style.top=y+'px';
+  p.addEventListener('click',e=>e.stopPropagation());
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.node')&&!e.target.closest('.forumcard')&&!e.target.closest('.actorcell')&&!e.target.closest('.popover'))closePopover();
+});
+
+/* ================= MODALS ================= */
+function closeModals(){
+  document.querySelectorAll('.overlay').forEach(o=>{if(o.id!=='resetOverlay')o.classList.remove('show');});
+}
+function openMandatModal(preselect){
+  closePopover();
+  renderMandatPanel();
+  if(preselect)document.getElementById('mAktor').value=preselect;
+  loadMandatForm();
+  document.getElementById('mandatModalTitle').textContent=
+    preselect?'Redigera aktör i mandatlandskapet':'Lägg till aktör i mandatlandskapet';
+  document.getElementById('mandatOverlay').classList.add('show');
+}
+function openForumModal(id){
+  closePopover();
+  editingForum=id||null;
+  document.getElementById('forumModalTitle').textContent=id?'Redigera forum':'Lägg till forum';
+  const f=id?state.forum.find(x=>x.id===id):null;
+  document.getElementById('fAktorer').innerHTML=state.aktorer.map(a=>
+    `<label><input type="checkbox" class="fakt" value="${a.id}" ${f&&f.aktorer.includes(a.id)?'checked':''}> ${esc(a.namn)}</label>`
+  ).join('')||'<span class="hint">Lägg till aktörer på startsidan.</span>';
+  fStatus.value=f?f.status:'Befintligt forum'; fNamn.value=f?f.namn:'';
+  fSamman.value=f?f.samman:'Nationell nivå'; fSammanOvr.value=f?.sammanOvr||'';
+  fSyfte.value=f?.syfte||''; fRoll.value=f?f.roll:'Central roll'; fTyp.value=f?f.typ:'Direkt kontakt';
+  fFrekvens.value=f?.frekvens||''; fUtv.value=f?f.utv:'Nej'; fUtvB.value=f?.utvB||'';
+  fForankring.value=f?f.forankring:'Ja'; fAnt.value=f?.ant||'';
+  document.getElementById('fUtvBWrap').style.display=fUtv.value==='Ja'?'block':'none';
+  document.getElementById('fSammanOvrWrap').style.display=fSamman.value==='Övrig'?'block':'none';
+  document.getElementById('forumOverlay').classList.add('show');
+}
+function openRollerModal(preselect){
+  closePopover();
+  const sel=document.getElementById('rAktor');
+  sel.innerHTML='<option value="">– Välj aktör –</option>'+state.aktorer.map(a=>`<option value="${a.id}">${esc(a.namn)}</option>`).join('');
+  if(preselect)sel.value=preselect;
+  document.getElementById('rollerModalTitle').textContent=
+    preselect?'Redigera roller för aktör':'Lägg till roller för aktör';
+  loadRollerForm();
+  document.getElementById('rollerOverlay').classList.add('show');
+}
+
+/* ================= FLIK 1 ================= */
+function setSakfraga(v){state.sakfraga=v;setSakfragaBadge();save();}
+function setSakfragaBadge(){document.getElementById('sakfragaBadge').textContent=state.sakfraga||'Ingen sakfråga angiven ännu';}
+function toggleAktorExtra(){
+  const n=document.getElementById('aNiva').value;
+  document.getElementById('aDepWrap').style.display=n==='Nationell'?'block':'none';
+  document.getElementById('aOvrWrap').style.display=n==='Övrig'?'block':'none';
+}
+function addAktor(){
+  const namn=document.getElementById('aNamn').value.trim(); if(!namn)return alert('Ange aktörens namn.');
+  state.aktorer.push({id:uid(),namn,niva:document.getElementById('aNiva').value,
+    dep:document.getElementById('aDep').value.trim(),ovr:document.getElementById('aOvr').value.trim()});
+  document.getElementById('aNamn').value='';document.getElementById('aDep').value='';document.getElementById('aOvr').value='';
+  save();renderAll();
+}
+function removeAktor(id){
+  if(!confirm('Ta bort aktören? Den försvinner även från övriga flikar.'))return;
+  state.aktorer=state.aktorer.filter(a=>a.id!==id); delete state.mandat[id]; delete state.roller[id];
+  Object.values(state.mandat).forEach(m=>m.deps=m.deps.filter(d=>d!==id));
+  state.forum.forEach(f=>f.aktorer=f.aktorer.filter(d=>d!==id));
+  save();renderAll();
+}
+function addKontakt(){
+  const namn=document.getElementById('kNamn').value.trim(); if(!namn)return alert('Ange namn.');
+  state.kontakter.push({namn,roll:kRoll.value,mail:kMail.value,tel:kTel.value,ant:kAnt.value});
+  ['kNamn','kRoll','kMail','kTel','kAnt'].forEach(i=>document.getElementById(i).value='');
+  save();renderAll();
+}
+function renderStart(){
+  document.getElementById('sakfraga').value=state.sakfraga; setSakfragaBadge();
+  document.getElementById('aktorList').innerHTML=state.aktorer.map(a=>
+    `<span class="chip"><span class="lvl" style="background:${LEVELS[a.niva]||LEVELS['Övrig']}"></span>${esc(a.namn)}
+     <small style="color:var(--muted)">${esc(a.niva==='Övrig'&&a.ovr?a.ovr:a.niva)}${a.dep?' · '+esc(a.dep):''}</small>
+     <button onclick="removeAktor('${a.id}')" title="Ta bort">✕</button></span>`).join('')||'<p class="hint">Inga aktörer tillagda ännu.</p>';
+  document.getElementById('kontaktList').innerHTML=state.kontakter.length?
+    '<table><tr><th>Namn</th><th>Roll</th><th>Mail</th><th>Telefon</th><th>Anteckningar</th><th></th></tr>'+
+    state.kontakter.map((k,i)=>`<tr><td>${esc(k.namn)}</td><td>${esc(k.roll)}</td><td>${esc(k.mail)}</td><td>${esc(k.tel)}</td><td>${esc(k.ant)}</td>
+    <td><button class="btn danger small" onclick="state.kontakter.splice(${i},1);save();renderAll()">✕</button></td></tr>`).join('')+'</table>':'<p class="hint">Inga kontaktpersoner ännu.</p>';
+}
+
+/* ================= FLIK 2 – MANDAT ================= */
+const MROWS=['Juridiskt beslutande','Juridiskt vägledande','Inget juridiskt mandat'];
+const MCOLS=['Lågt beroende','Medel beroende','Högt beroende'];
+function renderMandatPanel(){
+  const sel=document.getElementById('mAktor'), cur=sel.value;
+  sel.innerHTML='<option value="">– Välj aktör –</option>'+state.aktorer.map(a=>`<option value="${a.id}">${esc(a.namn)}</option>`).join('');
+  if([...sel.options].some(o=>o.value===cur))sel.value=cur;
+  renderDepChecks();
+}
+function renderDepChecks(){
+  const id=document.getElementById('mAktor').value;
+  document.getElementById('mDeps').innerHTML=state.aktorer.filter(a=>a.id!==id).map(a=>
+    `<label><input type="checkbox" value="${a.id}" class="mdep" ${state.mandat[id]?.deps?.includes(a.id)?'checked':''}> ${esc(a.namn)}</label>`).join('')||'<span class="hint">Lägg till fler aktörer på startsidan.</span>';
+}
+function loadMandatForm(){
+  const id=document.getElementById('mAktor').value, m=state.mandat[id]||{};
+  mGrund.value=m.grund||'';mMandat.value=m.mandat||'Juridiskt beslutande';mMandatB.value=m.mandatB||'';
+  mBeroende.value=m.beroende||'Lågt beroende';mBeroendeB.value=m.beroendeB||'';mAnt.value=m.ant||'';
+  renderDepChecks();
+}
+function saveMandat(){
+  const id=document.getElementById('mAktor').value; if(!id)return alert('Välj en aktör.');
+  state.mandat[id]={grund:mGrund.value,mandat:mMandat.value,mandatB:mMandatB.value,
+    beroende:mBeroende.value,beroendeB:mBeroendeB.value,ant:mAnt.value,
+    deps:[...document.querySelectorAll('.mdep:checked')].map(c=>c.value)};
+  save();closeModals();renderMandat();
+}
+function removeMandat(){
+  const id=document.getElementById('mAktor').value; if(!id)return;
+  delete state.mandat[id];if(selectedNode===id)selectedNode=null;
+  save();closeModals();renderMandat();
+}
+function toggleAllRel(){showAllRel=!showAllRel;
+  document.getElementById('allRelBtn').textContent=showAllRel?'Dölj alla relationer':'Visa alla relationer';renderMandat();}
+function showMandatInfo(id,anchor){
+  const a=state.aktorer.find(x=>x.id===id), m=state.mandat[id]; if(!a||!m)return;
+  const deps=(m.deps||[]).map(d=>state.aktorer.find(x=>x.id===d)?.namn).filter(Boolean);
+  showPopover(`
+    <h3><span class="dot" style="background:${LEVELS[a.niva]||LEVELS['Övrig']}"></span>${esc(a.namn)}</h3>
+    <span class="tag">${esc(a.niva==='Övrig'&&a.ovr?a.ovr:a.niva)}</span>
+    ${a.dep?`<span class="tag">${esc(a.dep)}</span>`:''}
+    <span class="tag">${esc(m.mandat)}</span><span class="tag">${esc(m.beroende)}</span>
+    ${m.grund?`<div class="field"><b>Grunduppdrag</b>${esc(m.grund)}</div>`:''}
+    ${m.mandatB?`<div class="field"><b>Juridiskt mandat</b>${esc(m.mandatB)}</div>`:''}
+    ${m.beroendeB?`<div class="field"><b>Beroende</b>${esc(m.beroendeB)}</div>`:''}
+    ${deps.length?`<div class="field"><b>Beroende av</b>${esc(deps.join(', '))}</div>`:''}
+    ${m.ant?`<div class="field"><b>Anteckningar</b>${esc(m.ant)}</div>`:''}
+    <div class="actions">
+      <button class="btn ghost small" onclick="closePopover()">Stäng</button>
+      <button class="btn small" onclick="openMandatModal('${id}')">Redigera</button>
+    </div>`,anchor);
+}
+function renderMandat(){
+  const g=document.getElementById('mgrid');g.innerHTML='';
+  /* Axelrubriker överst, som i dialog & samverkan */
+  g.appendChild(document.createElement('div')); /* tomt hörn */
+  MCOLS.forEach(c=>{const xl=document.createElement('div');xl.className='xlab';xl.textContent=c;g.appendChild(xl);});
+  MROWS.forEach(r=>{
+    const yl=document.createElement('div');yl.className='ylab';yl.textContent=r;g.appendChild(yl);
+    MCOLS.forEach(c=>{
+      const cell=document.createElement('div');cell.className='cell';g.appendChild(cell);
+      Object.entries(state.mandat).forEach(([id,m])=>{
+        if(m.mandat!==r||m.beroende!==c)return;
+        const a=state.aktorer.find(x=>x.id===id);if(!a)return;
+        const n=document.createElement('div');n.className='node';n.id='node-'+id;
+        n.style.background=`var(--${LVLVAR[a.niva]||'ovr'})`;
+        n.textContent=a.namn;
+        n.onclick=e=>{
+          e.stopPropagation();
+          if(selectedNode===id){selectedNode=null;closePopover();renderMandat();}
+          else{selectedNode=id;renderMandat();showMandatInfo(id,document.getElementById('node-'+id));}
+        };
+        if(selectedNode===id)n.classList.add('selected');
+        cell.appendChild(n);
+      });
+    });
+  });
+  drawArrows();
+}
+function edgePoint(rect,gr,tx,ty,margin){
+  const cx=rect.left+rect.width/2-gr.left, cy=rect.top+rect.height/2-gr.top;
+  let dx=tx-cx, dy=ty-cy;
+  const len=Math.hypot(dx,dy)||1; dx/=len; dy/=len;
+  const hw=rect.width/2+margin, hh=rect.height/2+margin;
+  const t=1/Math.max(Math.abs(dx)/hw,Math.abs(dy)/hh);
+  return {x:cx+dx*t, y:cy+dy*t};
+}
+function drawArrows(){
+  const g=document.getElementById('mgrid');
+  const old=g.querySelector('svg.arrows');if(old)old.remove();
+  const pairs=[];
+  Object.keys(state.mandat).forEach(id=>{(state.mandat[id].deps||[]).forEach(d=>{
+    if(!state.mandat[d])return;
+    if(showAllRel||selectedNode===id||selectedNode===d)pairs.push([id,d]);
+  });});
+  if(!pairs.length){if(selectedNode)dimNodes([]);return;}
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('arrows');
+  const gr=g.getBoundingClientRect();
+  const NS='http://www.w3.org/2000/svg';
+  const HEAD=10, HEADW=8, GAP=2;
+  function head(tip,dirX,dirY,color){
+    const bx=tip.x-dirX*HEAD, by=tip.y-dirY*HEAD;
+    const px=-dirY, py=dirX;
+    const poly=document.createElementNS(NS,'polygon');
+    poly.setAttribute('points',`${tip.x},${tip.y} ${bx+px*HEADW/2},${by+py*HEADW/2} ${bx-px*HEADW/2},${by-py*HEADW/2}`);
+    poly.setAttribute('fill',color);poly.setAttribute('opacity','.9');
+    svg.appendChild(poly);
+    return {x:bx,y:by};
+  }
+  const seen=new Set();
+  pairs.forEach(([a,b])=>{
+    const key=[a,b].sort().join('|');
+    const mutual=(state.mandat[b]?.deps||[]).includes(a);
+    if(mutual&&seen.has(key))return; seen.add(key);
+    const na=document.getElementById('node-'+a),nb=document.getElementById('node-'+b);
+    if(!na||!nb)return;
+    const ra=na.getBoundingClientRect(),rb=nb.getBoundingClientRect();
+    const cx1=ra.left+ra.width/2-gr.left, cy1=ra.top+ra.height/2-gr.top;
+    const cx2=rb.left+rb.width/2-gr.left, cy2=rb.top+rb.height/2-gr.top;
+    const dx=cx2-cx1,dy=cy2-cy1,len=Math.hypot(dx,dy)||1;
+    const mx=(cx1+cx2)/2+(-dy/len)*Math.min(40,len/4), my=(cy1+cy2)/2+(dx/len)*Math.min(40,len/4);
+    const start=edgePoint(ra,gr,mx,my,GAP);
+    const end=edgePoint(rb,gr,mx,my,GAP);
+    let color;
+    if(mutual)color='#c2803f';
+    else if(selectedNode===b&&selectedNode!==a)color='#4e9367';
+    else color='#4a7fb5';
+    let edx=end.x-mx, edy=end.y-my; let el=Math.hypot(edx,edy)||1; edx/=el; edy/=el;
+    const lineEnd=head(end,edx,edy,color);
+    let lineStart=start;
+    if(mutual){
+      let sdx=start.x-mx, sdy=start.y-my; let sl=Math.hypot(sdx,sdy)||1; sdx/=sl; sdy/=sl;
+      lineStart=head(start,sdx,sdy,color);
+    }
+    const p=document.createElementNS(NS,'path');
+    p.setAttribute('d',`M${lineStart.x},${lineStart.y} Q${mx},${my} ${lineEnd.x},${lineEnd.y}`);
+    p.setAttribute('fill','none');p.setAttribute('stroke',color);
+    p.setAttribute('stroke-width','2.2');p.setAttribute('opacity','.85');p.setAttribute('stroke-linecap','round');
+    svg.appendChild(p);
+  });
+  g.appendChild(svg);
+  if(selectedNode)dimNodes(pairs);
+}
+function dimNodes(pairs){
+  const related=new Set([selectedNode]);pairs.forEach(([a,b])=>{related.add(a);related.add(b);});
+  Object.keys(state.mandat).forEach(id=>{
+    const n=document.getElementById('node-'+id);
+    if(n)n.classList.toggle('dim',!related.has(id));
+  });
+}
+
+/* ================= FLIK 3 – DIALOG ================= */
+function showForumInfo(id,anchor){
+  const f=state.forum.find(x=>x.id===id);if(!f)return;
+  const akt=f.aktorer.map(d=>state.aktorer.find(a=>a.id===d)?.namn).filter(Boolean);
+  showPopover(`
+    <h3>${esc(f.namn)}</h3>
+    <span class="tag">${esc(f.status)}</span><span class="tag">${esc(f.roll)}</span><span class="tag">${esc(f.typ)}</span>
+    ${f.utv==='Ja'?'<span class="tag red">Utvecklingsbehov</span>':''}
+    ${f.forankring==='Nej'?'<span class="tag red">Saknar förankringsformer</span>':''}
+    <div class="field"><b>Sammankallande</b>${esc(f.samman==='Övrig'&&f.sammanOvr?f.sammanOvr:f.samman)}</div>
+    ${f.syfte?`<div class="field"><b>Syfte</b>${esc(f.syfte)}</div>`:''}
+    ${f.frekvens?`<div class="field"><b>Mötesfrekvens</b>${esc(f.frekvens)}</div>`:''}
+    ${f.utv==='Ja'&&f.utvB?`<div class="field"><b>Utvecklingsbehov</b>${esc(f.utvB)}</div>`:''}
+    <div class="field"><b>Förankringsformer</b>${esc(f.forankring)}</div>
+    ${akt.length?`<div class="field"><b>Deltagande aktörer</b>${esc(akt.join(', '))}</div>`:''}
+    ${f.ant?`<div class="field"><b>Anteckningar</b>${esc(f.ant)}</div>`:''}
+    <div class="actions">
+      <button class="btn ghost small" onclick="closePopover()">Stäng</button>
+      <button class="btn small" onclick="openForumModal('${id}')">Redigera</button>
+    </div>`,anchor);
+}
+function renderDialog(){
+  const g=document.getElementById('dgrid');g.innerHTML='';
+  g.appendChild(Object.assign(document.createElement('div'),{className:'head',textContent:'Sammankallande \\ Typ'}));
+  TYPER.forEach((t,i)=>g.appendChild(Object.assign(document.createElement('div'),{className:'head',textContent:(i+1)+'. '+t})));
+  const filter=document.getElementById('fFilter').value;
+  SAMMAN.forEach(s=>{
+    g.appendChild(Object.assign(document.createElement('div'),{className:'head',textContent:s}));
+    TYPER.forEach(t=>{
+      const cell=document.createElement('div');cell.className='cell';g.appendChild(cell);
+      state.forum.filter(f=>f.samman===s&&f.typ===t&&(filter==='alla'||f.roll===filter)).forEach(f=>{
+        const c=document.createElement('div');
+        c.className='forumcard'+(f.status==='Forum som saknas'?' saknas':'')+(f.utv==='Ja'?' utv':'');
+        c.textContent=f.namn;
+        c.onclick=e=>{e.stopPropagation();showForumInfo(f.id,c);};
+        cell.appendChild(c);
+      });
+    });
+  });
+}
+function saveForum(){
+  if(!fNamn.value.trim())return alert('Ange forumets namn.');
+  const data={id:editingForum||uid(),status:fStatus.value,namn:fNamn.value.trim(),
+    aktorer:[...document.querySelectorAll('.fakt:checked')].map(c=>c.value),
+    samman:fSamman.value,sammanOvr:fSammanOvr.value,syfte:fSyfte.value,roll:fRoll.value,typ:fTyp.value,
+    frekvens:fFrekvens.value,utv:fUtv.value,utvB:fUtvB.value,forankring:fForankring.value,ant:fAnt.value};
+  const i=state.forum.findIndex(f=>f.id===data.id);
+  if(i>=0)state.forum[i]=data;else state.forum.push(data);
+  editingForum=null;save();closeModals();renderDialog();
+}
+function deleteForum(){
+  if(!editingForum){closeModals();return;}
+  if(!confirm('Ta bort forumet?'))return;
+  state.forum=state.forum.filter(f=>f.id!==editingForum);
+  editingForum=null;save();closeModals();renderDialog();
+}
+
+/* ================= FLIK 4 – ROLLER ================= */
+function loadRollerForm(){
+  const id=document.getElementById('rAktor').value, r=state.roller[id]||{roller:{},ant:''};
+  document.getElementById('rRoller').innerHTML=ROLLER.map((roll,i)=>{
+    const checked=roll in r.roller;
+    return `<div class="rolecheck">
+      <label><input type="checkbox" class="rchk" value="${esc(roll)}" ${checked?'checked':''}
+        onchange="document.getElementById('rdesc-${i}').style.display=this.checked?'block':'none'"> ${esc(roll)}</label>
+      <textarea id="rdesc-${i}" placeholder="Beskriv rollen (valfritt) ..." style="display:${checked?'block':'none'}">${esc(r.roller[roll]||'')}</textarea>
+    </div>`;
+  }).join('');
+  document.getElementById('rAnt').value=r.ant||'';
+}
+function saveRoller(){
+  const id=document.getElementById('rAktor').value; if(!id)return alert('Välj en aktör.');
+  const roller={};
+  document.querySelectorAll('.rchk').forEach((c,i)=>{
+    if(c.checked)roller[c.value]=document.getElementById('rdesc-'+i).value;
+  });
+  state.roller[id]={roller,ant:document.getElementById('rAnt').value};
+  save();closeModals();renderRoller();
+}
+function removeRoller(){
+  const id=document.getElementById('rAktor').value; if(!id)return;
+  delete state.roller[id];save();closeModals();renderRoller();
+}
+function showRollerInfo(id,anchor){
+  const a=state.aktorer.find(x=>x.id===id), r=state.roller[id]; if(!a||!r)return;
+  const rows=Object.entries(r.roller).map(([roll,b])=>
+    `<div class="field"><b>${esc(roll)}</b>${b?esc(b):'<span class="hint">Ingen beskrivning</span>'}</div>`).join('');
+  showPopover(`
+    <h3><span class="dot" style="background:${LEVELS[a.niva]||LEVELS['Övrig']}"></span>${esc(a.namn)}</h3>
+    <span class="tag">${esc(a.niva==='Övrig'&&a.ovr?a.ovr:a.niva)}</span>
+    ${a.dep?`<span class="tag">${esc(a.dep)}</span>`:''}
+    ${rows||'<div class="field"><span class="hint">Inga roller ikryssade.</span></div>'}
+    ${r.ant?`<div class="field"><b>Anteckningar</b>${esc(r.ant)}</div>`:''}
+    <div class="actions">
+      <button class="btn ghost small" onclick="closePopover()">Stäng</button>
+      <button class="btn small" onclick="openRollerModal('${id}')">Redigera</button>
+    </div>`,anchor);
+}
+function renderRoller(){
+  const g=document.getElementById('rgrid');g.innerHTML='';
+  g.style.gridTemplateColumns=`minmax(140px,1.4fr) repeat(${ROLLER.length},1fr)`;
+  g.appendChild(Object.assign(document.createElement('div'),{className:'head',textContent:'Aktör'}));
+  ROLLER.forEach(r=>g.appendChild(Object.assign(document.createElement('div'),{className:'head',textContent:r})));
+  const ids=Object.keys(state.roller).filter(id=>state.aktorer.some(a=>a.id===id));
+  if(!ids.length){
+    const d=document.createElement('div');d.className='hint';d.style.gridColumn=`1 / span ${ROLLER.length+1}`;
+    d.style.padding='14px';d.textContent='Inga aktörer i rollmatrisen ännu. Klicka på "Lägg till roller för aktör".';
+    g.appendChild(d);return;
+  }
+  ids.forEach(id=>{
+    const a=state.aktorer.find(x=>x.id===id), r=state.roller[id];
+    const ac=document.createElement('div');ac.className='actorcell';
+    ac.innerHTML=`<span class="dot" style="background:${LEVELS[a.niva]||LEVELS['Övrig']}"></span>${esc(a.namn)}`;
+    ac.onclick=e=>{e.stopPropagation();showRollerInfo(id,ac);};
+    g.appendChild(ac);
+    ROLLER.forEach(roll=>{
+      const c=document.createElement('div');c.className='rcell';
+      if(roll in r.roller){
+        const d=document.createElement('span');d.className='rdot';
+        if(r.roller[roll])d.title=r.roller[roll];
+        c.appendChild(d);
+        c.style.cursor='pointer';
+        c.onclick=e=>{e.stopPropagation();showRollerInfo(id,c);};
+      }
+      g.appendChild(c);
+    });
+  });
+}
+
+/* ================= FLIK 5 – TODO ================= */
+function renderTodo(){
+  const b=document.getElementById('board');b.innerHTML='';
+  TODO_COLS.forEach(([key,title])=>{
+    const col=document.createElement('div');col.className='col';col.dataset.key=key;
+    col.innerHTML=`<h3>${title}</h3>`;
+    col.ondragover=e=>{e.preventDefault();col.classList.add('dragover');};
+    col.ondragleave=()=>col.classList.remove('dragover');
+    col.ondrop=e=>{e.preventDefault();col.classList.remove('dragover');
+      const [fromKey,cid]=e.dataTransfer.getData('text').split('|');
+      const idx=state.todo[fromKey].findIndex(c=>c.id===cid);if(idx<0)return;
+      state.todo[key].push(state.todo[fromKey].splice(idx,1)[0]);save();renderTodo();};
+    state.todo[key].forEach(cardData=>{
+      const c=document.createElement('div');c.className='todo-card';c.draggable=true;
+      c.ondragstart=e=>e.dataTransfer.setData('text',key+'|'+cardData.id);
+      c.innerHTML=`<div>${esc(cardData.text)}</div><div class="tools">
+        <button onclick="editCard('${key}','${cardData.id}')">Redigera</button>
+        <button onclick="delCard('${key}','${cardData.id}')">Ta bort</button></div>`;
+      col.appendChild(c);
+    });
+    const add=document.createElement('button');add.className='btn ghost small';add.textContent='+ Lägg till kort';
+    add.onclick=()=>{const t=prompt('Anteckning:');if(t){state.todo[key].push({id:uid(),text:t});save();renderTodo();}};
+    col.appendChild(add);b.appendChild(col);
+  });
+}
+function editCard(key,id){const c=state.todo[key].find(x=>x.id===id);const t=prompt('Redigera:',c.text);if(t!==null){c.text=t;save();renderTodo();}}
+function delCard(key,id){state.todo[key]=state.todo[key].filter(x=>x.id!==id);save();renderTodo();}
+
+/* ================= BILD ================= */
+function saveImage(elId,name){
+  closePopover();
+  const el=document.getElementById(elId);
+  html2canvas(el,{scale:2,backgroundColor:'#ffffff',width:el.scrollWidth,height:el.scrollHeight,
+    windowWidth:el.scrollWidth,windowHeight:el.scrollHeight}).then(canvas=>{
+    const a=document.createElement('a');
+    a.download=(state.sakfraga||'sakfraga')+'_'+name+'.jpeg';
+    a.href=canvas.toDataURL('image/jpeg',0.95);a.click();
+  });
+}
+
+/* ================= EXCEL ================= */
+function exportExcel(){
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Sakfråga',state.sakfraga]]),'Sakfråga');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(state.aktorer),'Aktörer');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(state.kontakter),'Kontaktpersoner');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(Object.entries(state.mandat).map(([id,m])=>({id,...m,deps:(m.deps||[]).join(';')}))),'Mandatlandskap');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(state.forum.map(f=>({...f,aktorer:f.aktorer.join(';')}))),'Dialog och samverkan');
+  const rollerRows=[];
+  Object.entries(state.roller).forEach(([id,r])=>{
+    const namn=state.aktorer.find(a=>a.id===id)?.namn||'';
+    const entries=Object.entries(r.roller);
+    if(!entries.length)rollerRows.push({id,aktor:namn,roll:'',beskrivning:'',ant:r.ant||''});
+    else entries.forEach(([roll,b],i)=>rollerRows.push({id,aktor:namn,roll,beskrivning:b,ant:i===0?(r.ant||''):''}));
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rollerRows.length?rollerRows:[{id:'',aktor:'',roll:'',beskrivning:'',ant:''}]),'Roller');
+  const todoRows=[];TODO_COLS.forEach(([k,t])=>state.todo[k].forEach(c=>todoRows.push({rubrik:t,kolumn:k,id:c.id,text:c.text})));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(todoRows.length?todoRows:[{rubrik:'',kolumn:'',id:'',text:''}]),'Anteckningar');
+  XLSX.writeFile(wb,(state.sakfraga.trim()||'sakfraga')+'.xlsx');
+}
+function importExcel(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const sheet=n=>wb.Sheets[n]?XLSX.utils.sheet_to_json(wb.Sheets[n]):[];
+      const sak=wb.Sheets['Sakfråga']?XLSX.utils.sheet_to_json(wb.Sheets['Sakfråga'],{header:1}):[];
+      state.sakfraga=(sak[0]&&sak[0][1])||'';
+      state.aktorer=sheet('Aktörer').map(a=>({id:String(a.id||uid()),namn:a.namn||'',niva:a.niva||'Övrig',dep:a.dep||'',ovr:a.ovr||''}));
+      state.kontakter=sheet('Kontaktpersoner');
+      state.mandat={};sheet('Mandatlandskap').forEach(m=>{state.mandat[String(m.id)]={grund:m.grund||'',mandat:m.mandat||'Juridiskt beslutande',
+        mandatB:m.mandatB||'',beroende:m.beroende||'Lågt beroende',beroendeB:m.beroendeB||'',ant:m.ant||'',
+        deps:m.deps?String(m.deps).split(';').filter(Boolean):[]};});
+      state.forum=sheet('Dialog och samverkan').map(f=>({...f,id:String(f.id||uid()),aktorer:f.aktorer?String(f.aktorer).split(';').filter(Boolean):[]}));
+      state.roller={};
+      sheet('Roller').forEach(r=>{
+        if(!r.id)return;
+        const id=String(r.id);
+        if(!state.roller[id])state.roller[id]={roller:{},ant:''};
+        if(r.roll)state.roller[id].roller[r.roll]=r.beskrivning||'';
+        if(r.ant)state.roller[id].ant=r.ant;
+      });
+      state.todo={roller:[],samverkan:[],verktyg:[]};
+      sheet('Anteckningar').forEach(r=>{if(r.kolumn&&state.todo[r.kolumn]&&r.text)state.todo[r.kolumn].push({id:String(r.id||uid()),text:r.text});});
+      selectedNode=null;editingForum=null;save();closeResetModal();renderAll();
+      alert('Sakfrågan importerades.');
+    }catch(err){alert('Kunde inte läsa filen: '+err.message);}
+    input.value='';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ================= INIT ================= */
+function renderAll(){renderStart();renderMandat();renderDialog();renderRoller();renderTodo();}
+window.addEventListener('resize',()=>drawArrows());
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModals();closePopover();}});
+(function init(){
+  try{const s=localStorage.getItem('samverkan');if(s)state=Object.assign(blankState(),JSON.parse(s));}catch(e){}
+  if(!state.roller)state.roller={};
+  toggleAktorExtra();renderAll();
+  openResetModal(true);
+})();
+</script>
+</body>
+</html>
